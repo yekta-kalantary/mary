@@ -61,6 +61,13 @@ class ChoicesOffline extends Component
         return $this->attributes->has('required') && $this->attributes->get('required') == true;
     }
 
+    public function getOptionValue($option): mixed
+    {
+        $value = data_get($option, $this->optionValue);
+
+        return is_numeric($value) && ! str($value)->startsWith('0') ? $value : "'$value'";
+    }
+
     public function render(): View|Closure|string
     {
         return <<<'HTML'
@@ -134,6 +141,9 @@ class ChoicesOffline extends Component
                                     ? this.selection == id
                                     : this.selection.includes(id)
                             },
+                            isHidden(id) {
+                                return this.searchOptions.filter(i => i.{{ $optionValue }} == id).length == 0
+                            },
                             toggle(id) {
                                 if (this.isReadonly) {
                                     return
@@ -202,15 +212,6 @@ class ChoicesOffline extends Component
                             <!-- CLEAR ICON  -->
                             @if(! $isReadonly())
                                 <x-mary-icon @click="reset()"  name="o-x-mark" class="absolute top-1/2 right-8 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-gray-600" />
-                            @endif
-
-                            <!-- SELECTION SLOT (render ahead of time to make it available for custom selection slot)-->
-                            @if($selection)
-                                <template x-for="(option, index) in searchOptions" :key="index">
-                                    <span x-bind:id="`selection-{{ $uuid}}-${option.{{ $optionValue }}}`" class="hidden mary-choices-element">
-                                        {{ $selection }}
-                                    </span>
-                                </template>
                             @endif
 
                             <!-- SELECTED OPTIONS -->
@@ -287,39 +288,30 @@ class ChoicesOffline extends Component
                                 </div>
 
 
-                                <template x-for="(option, index) in searchOptions" :key="index">
+                                @foreach($options as $option)
                                     <div
-                                        @click="toggle(option.{{ $optionValue }})"
-                                        :class="isActive(option.{{ $optionValue }}) && 'border-l-4 border-l-primary'"
-                                        class="mary-choices-element border-l-4"
+                                        wire:key="option-{{ data_get($option, $optionValue) }}"
+                                        @click="toggle({{ $getOptionValue($option) }})"
+                                        :class="isActive({{ $getOptionValue($option) }}) && 'border-l-4 border-l-primary'"
+                                        class="border-l-4"
                                     >
-                                        <!-- ITEM SLOT -->
-                                        @if($item)
-                                            {{ $item }}
-                                        @else
-                                            <div class="p-3 hover:bg-base-200 border border-t-0 border-b-base-200">
-                                                <div class="flex gap-3 items-center">
-                                                    <!-- AVATAR -->
+                                        <div :class="isHidden({{ $getOptionValue($option) }}) && 'hidden'">
+                                            <!-- ITEM SLOT -->
+                                            @if($item)
+                                                {{ $item }}
+                                            @else
+                                                <x-mary-list-item :item="$option" :value="$optionLabel" :sub-value="$optionSubLabel" :avatar="$optionAvatar" />
+                                            @endif
 
-                                                    <template x-if="option.{{ $optionAvatar }}">
-                                                        <div>
-                                                            <img :src="option.{{ $optionAvatar }}" class="rounded-full w-11 h-11" />
-                                                        </div>
-                                                    </template>
-                                                    <div class="flex-1 overflow-hidden whitespace-nowrap text-ellipsis truncate w-0 mary-hideable">
-                                                        <!-- LABEL -->
-                                                        <div x-text="option.{{ $optionLabel }}" class="font-semibold truncate"></div>
-
-                                                        <!-- SUB LABEL -->
-                                                        @if(!empty($optionSubLabel))
-                                                            <div x-text="option.{{ $optionSubLabel }}" class="text-gray-400 text-sm truncate"></div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endif
+                                            <!-- SELECTION SLOT -->
+                                            @if($selection)
+                                                <span id="selection-{{ $uuid }}-{{ data_get($option, $optionValue) }}" class="hidden">
+                                                    {{ $selection($option) }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
-                                </template>
+                                @endforeach
                             </div>
                         </div>
 
